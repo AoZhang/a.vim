@@ -71,8 +71,8 @@ endfunction
 
 " Add all the default extensions
 " Mappings for C and C++
-call <SID>AddAlternateExtensionMapping('h',"c,cpp,cxx,cc,CC")
-call <SID>AddAlternateExtensionMapping('H',"C,CPP,CXX,CC")
+call <SID>AddAlternateExtensionMapping('h',"cpp,c,cxx,cc,CC")
+call <SID>AddAlternateExtensionMapping('H',"CPP,C,CXX,CC")
 call <SID>AddAlternateExtensionMapping('hpp',"cpp,c")
 call <SID>AddAlternateExtensionMapping('HPP',"CPP,C")
 call <SID>AddAlternateExtensionMapping('c',"h")
@@ -107,8 +107,9 @@ call <SID>AddAlternateExtensionMapping('aspx', 'aspx.cs,aspx.vb')
 " Setup default search path, unless the user has specified
 " a path in their [._]vimrc. 
 if (!exists('g:alternateSearchPath'))
-  let g:alternateSearchPath = 'sfr:../source,sfr:../src,sfr:../include,sfr:../inc'
+  let g:alternateSearchPath = 'sfr:../source,sfr:../src,sfr:../include,sfr:../inc,sfr:../server,sfr:../client'
 endif
+let g:alternateSearchPath2 = '../../source,../../src,../../include,../../inc,../../server,../../client'
 
 " If this variable is true then a.vim will not alternate to a file/buffer which
 " does not exist. E.g while editing a.c and the :A will not swtich to a.h
@@ -376,6 +377,42 @@ function! EnumerateFilesByExtensionInPath(baseName, extension, pathList, relPath
    return enumeration
 endfunction
 
+" Function : EnumerateFilesByExtensionInFatherPath (PRIVATE)
+" Purpose  : enumerates all files by expanding the path list and the extension
+"            list.
+" Args     : baseName -- base name of the file
+"            extension -- extension whose alternates are to be enumerated
+"            pathList -- the list of paths to enumerate
+"            relPath -- the path of the current file for expansion of relative
+"                       paths in the path list.
+" Returns  : A comma separated list of paths with extensions
+" Author   : Michael Sharpe <feline@irendi.com>
+function! EnumerateFilesByExtensionInFatherPath(baseName, extension, pathList, relPathBase)
+   let midpath = fnamemodify(a:relPathBase, ":t")
+   let enumeration = ""
+   let filepath = ""
+   let m = 1
+   let pathListLen = strlen(a:pathList)
+   if (pathListLen > 0)
+      while (1)
+         let pathSpec = <SID>GetNthItemFromList(a:pathList, m) 
+         if (pathSpec != "")
+            let path = <SID>ExpandAlternatePath("sfr:" . pathSpec . "/" . midpath, a:relPathBase)
+            let pe = EnumerateFilesByExtension(path, a:baseName, a:extension)
+            if (enumeration == "")
+               let enumeration = pe
+            else
+               let enumeration = enumeration . "," . pe
+            endif
+         else
+            break
+         endif
+         let m = m + 1
+      endwhile
+   endif
+   return enumeration
+endfunction
+
 " Function : DetermineExtension (PRIVATE)
 " Purpose  : Determines the extension of a filename based on the register
 "            alternate extension. This allow extension which contain dots to 
@@ -445,15 +482,22 @@ function! AlternateFile(splitWindow, ...)
      if (extension != "")
         let allfiles1 = EnumerateFilesByExtension(currentPath, baseName, extension)
         let allfiles2 = EnumerateFilesByExtensionInPath(baseName, extension, g:alternateSearchPath, currentPath)
+        let allfiles3 = EnumerateFilesByExtensionInFatherPath(baseName, extension, g:alternateSearchPath2, currentPath)
 
-        if (allfiles1 != "")
-           if (allfiles2 != "")
-              let allfiles = allfiles1 . ',' . allfiles2
-           else
-              let allfiles = allfiles1
-           endif
-        else 
-           let allfiles = allfiles2
+        let allfiles = allfiles1
+        if (allfiles2 != "")
+            if (allfiles == "")
+               let allfiles = allfiles2
+            else
+               let allfiles = allfiles . ',' . allfiles2
+            endif
+        endif
+        if (allfiles3 != "")
+            if (allfiles == "")
+               let allfiles = allfiles3
+            else
+               let allfiles = allfiles . ',' . allfiles3
+            endif
         endif
      endif
 
